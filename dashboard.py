@@ -22,7 +22,7 @@ import position
 from cluster import CLUSTERS
 
 log = logging.getLogger(__name__)
-app = Flask(__name__, template_folder="templates")
+app = Flask(__name__, template_folder=".")
 
 
 def _ttr_remaining(end_iso: str) -> str:
