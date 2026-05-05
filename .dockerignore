@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+state/
+*.log
+.DS_Store
+.git/
+.gitignore
+SENTIBOT_v1_SPEC.md
+test_smoke.py

@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Nostradamus {{ version }}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         background: #0e1116; color: #e8e8e8; margin: 0; padding: 0; }
+  header { background: linear-gradient(180deg, #0a0c10 0%, #161b22 100%);
+           padding: 18px 20px 14px; border-bottom: 1px solid #30363d;
+           position: relative; }
+  header::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0;
+                  height: 1px; background: linear-gradient(90deg, transparent, #6e2828, transparent); }
+  h1 { margin: 0; font-family: "Times New Roman", Times, serif;
+       font-size: 28px; font-weight: 700; letter-spacing: 2px;
+       color: #d4c4a0;
+       text-shadow: 0 0 6px rgba(212, 196, 160, 0.2),
+                    0 2px 3px rgba(0, 0, 0, 0.7);
+       line-height: 1; }
+  h1 .subtitle { font-family: Arial, Helvetica, sans-serif;
+                 font-size: 11px; font-weight: 500;
+                 letter-spacing: 4px; color: #8b7d5a; margin-left: 12px;
+                 text-transform: uppercase; vertical-align: middle;
+                 text-shadow: none; }
+  nav { margin-top: 12px; }
+  nav a { color: #58a6ff; text-decoration: none; margin-right: 16px; font-size: 14px; }
+  nav a.active { color: #f0f6fc; font-weight: 600; }
+  nav a.warn { color: #d29922; }
+  nav a.warn.active { color: #f0c43c; font-weight: 600; }
+  .container { padding: 20px; max-width: 1600px; margin: 0 auto; }
+  .summary { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  .stat { background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+          padding: 10px 14px; min-width: 100px; }
+  .stat .label { font-size: 11px; color: #8b949e; text-transform: uppercase; }
+  .stat .val { font-size: 18px; font-weight: 600; margin-top: 2px; }
+  .pnl-pos { color: #3fb950; }
+  .pnl-neg { color: #f85149; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #21262d; }
+  th { background: #161b22; color: #8b949e; font-weight: 500; font-size: 11px;
+       text-transform: uppercase; }
+  tr:hover { background: #161b22; }
+  .uma-flag { background: #f85149; color: white; padding: 1px 6px; border-radius: 3px;
+              font-size: 10px; font-weight: 600; }
+  .cluster-tag { background: #30363d; color: #8b949e; padding: 2px 6px; border-radius: 3px;
+                 font-size: 11px; }
+  .btn { padding: 4px 10px; border: 1px solid #30363d; background: #21262d;
+         color: #e8e8e8; cursor: pointer; border-radius: 4px; font-size: 12px;
+         text-decoration: none; display: inline-block; }
+  .btn:hover { background: #30363d; }
+  .btn-danger { background: #6e2828; border-color: #8b2929; }
+  .btn-danger:hover { background: #8b2929; }
+  .question { max-width: 400px; }
+  .question a { color: #c9d1d9; text-decoration: none; }
+  .question a:hover { color: #58a6ff; text-decoration: underline; }
+  select { background: #0d1117; color: #e8e8e8; border: 1px solid #30363d;
+           padding: 3px; border-radius: 3px; font-size: 12px; }
+  .toggle { float: right; font-size: 12px; }
+  .empty { text-align: center; padding: 40px; color: #8b949e; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Nostradamus <span class="subtitle">v{{ version }} · dry mode</span></h1>
+  <nav>
+    <a href="/" class="{{ 'active' if view == 'open' else '' }}">Open ({{ summary.open }})</a>
+    <a href="/history" class="{{ 'active' if view == 'history' else '' }}">History</a>
+    <a href="/pending-verify" class="warn">Verify ({{ summary.verify_pending + summary.uma_pending + summary.disputed }})</a>
+    <a href="/discovery">Discovery Log</a>
+    <a href="/healthz">Health</a>
+    <span class="toggle">
+      {% if scaled %}
+        <a href="?scaled=0">View at $1/trade (raw)</a>
+      {% else %}
+        <a href="?scaled=1">View as if $100/trade</a>
+      {% endif %}
+    </span>
+  </nav>
+</header>
+
+<div class="container">
+  <div class="summary">
+    <div class="stat"><div class="label">Total</div><div class="val">{{ summary.total }}</div></div>
+    <div class="stat"><div class="label">Open</div><div class="val">{{ summary.open }}</div></div>
+    <div class="stat"><div class="label">Wins (NO)</div><div class="val pnl-pos">{{ summary.win }}</div></div>
+    <div class="stat"><div class="label">Losses (YES)</div><div class="val pnl-neg">{{ summary.loss }}</div></div>
+    <div class="stat"><div class="label">Manual Sold</div><div class="val">{{ summary.sold }}</div></div>
+    <div class="stat"><div class="label">UMA Pending</div><div class="val">{{ summary.uma_pending }}</div></div>
+    <div class="stat">
+      <div class="label">Win Rate</div>
+      <div class="val">{{ summary.win_rate_pct ~ '%' if summary.win_rate_pct is not none else '—' }}</div>
+    </div>
+    <div class="stat">
+      <div class="label">PnL ({{ '$100/trade scaled' if scaled else '$1/trade raw' }})</div>
+      <div class="val {{ 'pnl-pos' if summary.pnl_usd >= 0 else 'pnl-neg' }}">
+        ${{ '%.4f'|format(summary.pnl_usd) }}
+      </div>
+    </div>
+  </div>
+
+  {% if rows %}
+  <table>
+    <thead>
+      <tr>
+        <th>Cluster</th>
+        <th>Question</th>
+        <th>Entry</th>
+        <th>Cur Ask</th>
+        <th>Δ</th>
+        <th>TTR</th>
+        <th>Vol</th>
+        <th>Status</th>
+        <th>Flags</th>
+        <th>P&amp;L</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>
+          <form method="post" action="/reclassify/{{ r.market_id }}" style="display:inline">
+            <select name="cluster" onchange="this.form.submit()">
+              {% for code, label in clusters.items() %}
+                <option value="{{ code }}" {{ 'selected' if r.display_cluster == code else '' }}>
+                  {{ label }}
+                </option>
+              {% endfor %}
+            </select>
+          </form>
+          {% if r.cluster_override %}
+            <span class="cluster-tag" title="Auto: {{ r.cluster_auto }}">overridden</span>
+          {% endif %}
+        </td>
+        <td class="question">
+          <a href="{{ r.polymarket_url }}" target="_blank">{{ r.question }}</a>
+        </td>
+        <td>{{ '%.3f'|format(r.simulated_fill_price|float) }}</td>
+        <td>{{ r.current_no_ask if r.current_no_ask else '—' }}</td>
+        <td class="{{ 'pnl-neg' if (r.delta_price or '').startswith('+') else 'pnl-pos' }}">
+          {{ r.delta_price or '—' }}
+        </td>
+        <td>{{ r.ttr_remaining }}</td>
+        <td>{{ r.volume_at_entry or '—' }}</td>
+        <td>{{ r.status }}</td>
+        <td>
+          {% if r.uma_risk_flag == '1' or r.uma_risk_flag == 1 %}
+            <span class="uma-flag">UMA</span>
+          {% endif %}
+        </td>
+        <td>{{ r.pnl if r.pnl else '—' }}</td>
+        <td>
+          {% if r.status == 'OPEN' %}
+            <form method="post" action="/sell/{{ r.market_id }}" style="display:inline"
+                  onsubmit="return confirm('Sell paper position?');">
+              <button class="btn btn-danger" type="submit">Sell</button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <div class="empty">No {{ view }} positions yet.</div>
+  {% endif %}
+</div>
+</body>
+</html>

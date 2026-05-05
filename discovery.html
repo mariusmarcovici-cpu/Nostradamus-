@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Nostradamus — Discovery — {{ version }}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         background: #0e1116; color: #e8e8e8; margin: 0; padding: 0; }
+  header { background: linear-gradient(180deg, #0a0c10 0%, #161b22 100%);
+           padding: 18px 20px 14px; border-bottom: 1px solid #30363d;
+           position: relative; }
+  header::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0;
+                  height: 1px; background: linear-gradient(90deg, transparent, #6e2828, transparent); }
+  h1 { margin: 0; font-family: "Times New Roman", Times, serif;
+       font-size: 28px; font-weight: 700; letter-spacing: 2px;
+       color: #d4c4a0;
+       text-shadow: 0 0 6px rgba(212, 196, 160, 0.2),
+                    0 2px 3px rgba(0, 0, 0, 0.7);
+       line-height: 1; }
+  h1 .subtitle { font-family: Arial, Helvetica, sans-serif;
+                 font-size: 11px; font-weight: 500;
+                 letter-spacing: 4px; color: #8b7d5a; margin-left: 12px;
+                 text-transform: uppercase; vertical-align: middle;
+                 text-shadow: none; }
+  nav { margin-top: 8px; }
+  nav a { color: #58a6ff; text-decoration: none; margin-right: 16px; font-size: 14px; }
+  .container { padding: 20px; max-width: 1600px; margin: 0 auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #21262d; }
+  th { background: #161b22; color: #8b949e; font-weight: 500; font-size: 11px;
+       text-transform: uppercase; }
+  .pass { color: #3fb950; }
+  .fail { color: #8b949e; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Nostradamus <span class="subtitle">v{{ version }} · discovery log</span></h1>
+  <nav>
+    <a href="/">Open</a>
+    <a href="/history">History</a>
+    <a href="/pending-verify">Verify</a>
+    <a href="/discovery">Discovery Log</a>
+    <a href="/healthz">Health</a>
+  </nav>
+</header>
+<div class="container">
+  <table>
+    <thead>
+      <tr>
+        <th>TS</th><th>Slug</th><th>End</th><th>TTR (h)</th><th>NO Ask</th>
+        <th>Vol</th><th>Cluster</th><th>Result</th><th>Reason</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.discovery_ts[11:19] if r.discovery_ts else '' }}</td>
+        <td>{{ r.slug }}</td>
+        <td>{{ r.end_date_iso[:16] if r.end_date_iso else '' }}</td>
+        <td>{{ r.ttr_hours }}</td>
+        <td>{{ r.no_best_ask }}</td>
+        <td>{{ r.volume }}</td>
+        <td>{{ r.cluster }}</td>
+        <td class="{{ 'pass' if r.pass_fail == 'PASS' else 'fail' }}">{{ r.pass_fail }}</td>
+        <td>{{ r.reject_reason }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+</body>
+</html>
