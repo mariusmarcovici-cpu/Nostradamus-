@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 _LOCK = Lock()
 
 POSITION_COLS = [
-    "entry_ts", "market_id", "slug", "question",
+    "entry_ts", "market_id", "slug", "event_slug", "condition_id", "question",
     "cluster_auto", "cluster_override",
     "ttr_at_entry_hours",
     "no_token_id", "yes_token_id",
@@ -157,10 +157,18 @@ def create_entry(payload: dict) -> dict:
     )
     shares = config.SIMULATED_POSITION_USD / fill_price
 
+    # Build correct Polymarket URL: /event/<event_slug> (NOT market slug).
+    # Falls back to market slug if eventSlug missing — at worst the page 404s
+    # but at least the dashboard table doesn't crash.
+    event_slug = payload.get("event_slug") or payload.get("slug") or ""
+    polymarket_url = f"https://polymarket.com/event/{event_slug}" if event_slug else ""
+
     row = {
         "entry_ts": now,
         "market_id": payload["market_id"],
         "slug": payload["slug"],
+        "event_slug": payload.get("event_slug", ""),
+        "condition_id": payload.get("condition_id", ""),
         "question": payload["question"],
         "cluster_auto": payload["cluster_auto"],
         "cluster_override": "",
@@ -184,7 +192,7 @@ def create_entry(payload: dict) -> dict:
         "verify_first_poll_winner": "",
         "verify_last_attempt_ts": "",
         "verify_attempt_count": 0,
-        "polymarket_url": f"https://polymarket.com/event/{payload['slug']}",
+        "polymarket_url": polymarket_url,
     }
     _assert_no_nan(row, REQUIRED_ON_ENTRY)
     _write_row(config.POSITIONS_CSV, POSITION_COLS, row)

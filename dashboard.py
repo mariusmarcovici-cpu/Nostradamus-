@@ -54,6 +54,27 @@ def _delta_pct(row: dict) -> str:
         return ""
 
 
+def _build_polymarket_url(row: dict) -> str:
+    """Pick the best available URL.
+
+    Priority:
+      1. Stored polymarket_url (set at entry from eventSlug — correct for new entries)
+      2. event_slug field (for rows that have it but stored URL was blank)
+      3. market slug as last-resort fallback (often 404s on Polymarket, but
+         better than a blank link in the dashboard)
+    """
+    stored = (row.get("polymarket_url") or "").strip()
+    if stored:
+        return stored
+    event_slug = (row.get("event_slug") or "").strip()
+    if event_slug:
+        return f"https://polymarket.com/event/{event_slug}"
+    slug = (row.get("slug") or "").strip()
+    if slug:
+        return f"https://polymarket.com/event/{slug}"
+    return ""
+
+
 @app.route("/")
 def index():
     scaled = request.args.get("scaled") == "1"
@@ -65,7 +86,7 @@ def index():
         d = dict(r)
         d["ttr_remaining"] = _ttr_remaining(r.get("end_date_iso", ""))
         d["delta_price"] = _delta_pct(r)
-        d["polymarket_url"] = f"https://polymarket.com/event/{r.get('slug', '')}"
+        d["polymarket_url"] = _build_polymarket_url(r)
         d["display_cluster"] = r.get("cluster_override") or r.get("cluster_auto") or ""
         decorated.append(d)
     # Sort by TTR ascending (closest to resolution first)
@@ -91,7 +112,7 @@ def history():
     for r in closed:
         d = dict(r)
         d["display_cluster"] = r.get("cluster_override") or r.get("cluster_auto") or ""
-        d["polymarket_url"] = r.get("polymarket_url") or f"https://polymarket.com/event/{r.get('slug', '')}"
+        d["polymarket_url"] = _build_polymarket_url(r)
         decorated.append(d)
     decorated.sort(key=lambda x: x.get("exit_ts") or "", reverse=True)
     return render_template(
@@ -116,7 +137,7 @@ def pending_verify():
     for r in pending:
         d = dict(r)
         d["display_cluster"] = r.get("cluster_override") or r.get("cluster_auto") or ""
-        d["polymarket_url"] = r.get("polymarket_url") or f"https://polymarket.com/event/{r.get('slug', '')}"
+        d["polymarket_url"] = _build_polymarket_url(r)
         decorated.append(d)
     decorated.sort(key=lambda x: x.get("end_date_iso") or "")
     summary = position.compute_summary()

@@ -279,9 +279,25 @@ def evaluate_market(market: dict, now_utc: datetime,
     # PASS
     base_row["pass_fail"] = "PASS"
     depth = book_depth_top3(book, side="asks")
+
+    # Pull event slug — Polymarket renders /event/<eventSlug>, not /event/<marketSlug>
+    event_slug = ""
+    events = market.get("events") or []
+    if events and isinstance(events, list):
+        first_event = events[0] if events[0] else {}
+        event_slug = first_event.get("slug") or ""
+    # Fallbacks if events array isn't populated
+    if not event_slug:
+        event_slug = market.get("eventSlug") or market.get("event_slug") or ""
+
+    # conditionId is the unambiguous market identifier; some Polymarket URLs accept it
+    condition_id = market.get("conditionId") or ""
+
     entry_payload = {
         "market_id": market_id,
         "slug": slug,
+        "event_slug": event_slug,
+        "condition_id": condition_id,
         "question": question,
         "cluster_auto": base_row["cluster"],
         "ttr_at_entry_hours": round(ttr_hours, 2),
