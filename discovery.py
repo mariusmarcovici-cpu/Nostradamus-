@@ -248,6 +248,12 @@ def evaluate_market(market: dict, now_utc: datetime,
         base_row["reject_reason"] = "crypto_blacklist"
         return {"pass": False, "reject_reason": base_row["reject_reason"], "row": base_row, "entry_payload": None}
 
+    # v0.2.0: 2b. Cluster skip list (default: A_SPORTS).
+    # Sports markets had 100% of catastrophic losses in v0.1.0 data.
+    if base_row["cluster"] in config.SKIP_CLUSTERS:
+        base_row["reject_reason"] = f"cluster_skipped:{base_row['cluster']}"
+        return {"pass": False, "reject_reason": base_row["reject_reason"], "row": base_row, "entry_payload": None}
+
     # 3. UMA dispute flag (non-blocking)
     uma_flag = has_uma_dispute_marker(
         market.get("resolutionSource") or "",
