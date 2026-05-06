@@ -92,6 +92,12 @@ RESOLUTION_PRICE_SUM_TOLERANCE = 0.02
 # first poll. Set RESOLUTION_REQUIRE_TWO_POLLS=true to restore old behavior.
 RESOLUTION_REQUIRE_TWO_POLLS = _env("RESOLUTION_REQUIRE_TWO_POLLS", "false", str).lower() in ("true", "1", "yes")
 
+# v0.2.0: BLOCK UMA-flagged markets at entry. Was non-blocking in v0.1.0
+# (just labeled). UMA-resolved markets are subjective + dispute-prone; on
+# the v0.1.0 dataset all 4 catastrophic losses + 4 manual-sells carried
+# the UMA flag. Default-on. Set to false to restore old "label-only" mode.
+BLOCK_UMA_FLAGGED = _env("BLOCK_UMA_FLAGGED", "true", str).lower() in ("true", "1", "yes")
+
 # Logging
 LOG_LEVEL = _env("LOG_LEVEL", "INFO", str)
 

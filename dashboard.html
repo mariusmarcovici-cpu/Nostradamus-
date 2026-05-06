@@ -65,6 +65,7 @@
   <nav>
     <a href="/" class="{{ 'active' if view == 'open' else '' }}">Open ({{ summary.open }})</a>
     <a href="/history" class="{{ 'active' if view == 'history' else '' }}">History</a>
+    <a href="/pending-verify" class="warn">Verify ({{ summary.verify_pending + summary.uma_pending + summary.disputed }})</a>
     <a href="/discovery">Discovery Log</a>
     <a href="/healthz">Health</a>
     <span class="toggle">
