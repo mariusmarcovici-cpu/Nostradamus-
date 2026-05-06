@@ -191,21 +191,16 @@ def _verify_token_alignment(market: dict, stored_no_token_id: str) -> bool:
 
 
 def resolution_loop():
-    """Strict 2-poll resolution verification.
+    """v0.2.0: SINGLE-POLL resolution by default + auto-resolve-as-NO timer.
 
-    Flow:
-      1. Skip resolved positions (immutable).
-      2. Skip if not yet past end_date + RESOLUTION_MIN_AGE_S.
-      3. Fetch market from Gamma. If not closed yet:
-           - if past end + 4hrs: mark UMA_PENDING.
-           - else: leave as OPEN, retry next loop.
-      4. Parse outcomes/prices. Verify token alignment.
-      5. If poll #1: record winner, set RESOLUTION_AWAITING_2ND, log audit row.
-      6. If poll #2 (≥ RESOLUTION_CONFIRM_DELAY_S after poll #1):
-           - winners match → resolve (immutable), log audit row.
-           - winners differ → RESOLUTION_DISPUTED, log audit row.
+    Behavior set by config.RESOLUTION_REQUIRE_TWO_POLLS:
+      - False (default): clear winner + alignment OK → resolve immediately
+      - True (legacy): require 2 polls 60s apart that match
+    Stuck positions are auto-resolved as NO after AUTO_RESOLVE_AS_NO_AFTER_HOURS.
     """
-    log.info("resolution_loop started (strict 2-poll mode)")
+    mode = "2-poll legacy" if config.RESOLUTION_REQUIRE_TWO_POLLS else "single-poll"
+    log.info("resolution_loop started (%s, auto-resolve-as-NO at %dhr)",
+             mode, config.AUTO_RESOLVE_AS_NO_AFTER_HOURS)
     while True:
         try:
             now = datetime.now(timezone.utc)
