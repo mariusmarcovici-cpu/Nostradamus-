@@ -390,40 +390,83 @@ def _process_one_resolution(p: dict, now: datetime):
 
 # ---------- Entrypoint ----------
 
+def _background_init_and_loops():
+    """Heavy init runs in a background thread AFTER the port is bound.
+    This way /healthz responds immediately (Railway healthcheck passes)
+    even if state/CSV setup is slow or threads have issues.
+    """
+    try:
+        log.info("=" * 60)
+        log.info("Nostradamus %s starting up — DRY MODE", config.VERSION)
+        log.info("Window: TTR %d–%dh, Price NO %.2f–%.2f, Size $%.2f/trade",
+                 config.TTR_MIN_HOURS, config.TTR_MAX_HOURS,
+                 config.PRICE_MIN, config.PRICE_MAX,
+                 config.SIMULATED_POSITION_USD)
+        log.info("Skip clusters: %s",
+                 ",".join(sorted(config.SKIP_CLUSTERS)) or "(none)")
+        log.info("Max open positions: %d  ·  Auto-resolve-as-NO at %dhr  ·  Single-poll: %s",
+                 config.MAX_OPEN_POSITIONS,
+                 config.AUTO_RESOLVE_AS_NO_AFTER_HOURS,
+                 not config.RESOLUTION_REQUIRE_TWO_POLLS)
+        log.info("Block UMA-flagged: %s",
+                 "yes (subjective resolution markets blocked at entry + hidden in dashboard)"
+                 if config.BLOCK_UMA_FLAGGED else "no (UMA flag is label-only)")
+        log.info("=" * 60)
+
+        position.init_state()
+        log.info("init_state OK")
+        position.write_heartbeat()
+        log.info("heartbeat written")
+
+        threads = [
+            threading.Thread(target=discovery_loop, name="discovery", daemon=True),
+            threading.Thread(target=position_loop, name="position", daemon=True),
+            threading.Thread(target=resolution_loop, name="resolution", daemon=True),
+        ]
+        for t in threads:
+            t.start()
+            log.info("Started thread: %s", t.name)
+        log.info("All loops running. Bot is fully operational.")
+    except Exception as e:
+        log.exception("FATAL: background init failed: %s", e)
+        # Don't re-raise — Flask keeps running so healthcheck still passes
+        # and we can see the error in logs.
+
+
 def main():
-    log.info("=" * 60)
-    log.info("Nostradamus %s starting up — DRY MODE", config.VERSION)
-    log.info("Window: TTR %d–%dh, Price NO %.2f–%.2f, Size $%.2f/trade",
-             config.TTR_MIN_HOURS, config.TTR_MAX_HOURS,
-             config.PRICE_MIN, config.PRICE_MAX,
-             config.SIMULATED_POSITION_USD)
-    log.info("Skip clusters: %s",
-             ",".join(sorted(config.SKIP_CLUSTERS)) or "(none)")
-    log.info("Max open positions: %d  ·  Auto-resolve-as-NO at %dhr  ·  Single-poll: %s",
-             config.MAX_OPEN_POSITIONS,
-             config.AUTO_RESOLVE_AS_NO_AFTER_HOURS,
-             not config.RESOLUTION_REQUIRE_TWO_POLLS)
-    log.info("Block UMA-flagged: %s",
-             "yes (subjective resolution markets blocked at entry + hidden in dashboard)"
-             if config.BLOCK_UMA_FLAGGED else "no (UMA flag is label-only)")
-    log.info("=" * 60)
+    # IMPORTANT: bind the port BEFORE doing any heavy lifting. This makes
+    # Railway's healthcheck pass quickly and turns any later boot errors
+    # into visible log output instead of silent "service unavailable".
+    print("[boot] entered main(), pid=%d" % os.getpid(), flush=True)
+    sys.stdout.flush()
 
-    position.init_state()
-    position.write_heartbeat()
-
-    threads = [
-        threading.Thread(target=discovery_loop, name="discovery", daemon=True),
-        threading.Thread(target=position_loop, name="position", daemon=True),
-        threading.Thread(target=resolution_loop, name="resolution", daemon=True),
-    ]
-    for t in threads:
-        t.start()
-        log.info("Started thread: %s", t.name)
+    # Kick off real init in the background. dashboard.run() (below) blocks
+    # forever serving HTTP, so init must not block it.
+    init_thread = threading.Thread(target=_background_init_and_loops,
+                                    name="background-init", daemon=True)
+    init_thread.start()
 
     port = int(os.environ.get("PORT", config.DASHBOARD_PORT_DEFAULT))
-    log.info("Starting dashboard on port %d", port)
-    dashboard.run(port)
+    print("[boot] starting dashboard on port %d" % port, flush=True)
+    sys.stdout.flush()
+    try:
+        dashboard.run(port)
+    except Exception as e:
+        print("[boot] FATAL: dashboard.run crashed: %s" % e, flush=True)
+        log.exception("dashboard.run crashed")
+        raise
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        # Last-resort error reporter — if anything escapes, print to stderr
+        # so Railway's deploy logs definitely show it.
+        import traceback
+        sys.stderr.write("=" * 60 + "\n")
+        sys.stderr.write("FATAL UNCAUGHT EXCEPTION AT BOOT:\n")
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.write("=" * 60 + "\n")
+        sys.stderr.flush()
+        sys.exit(1)
