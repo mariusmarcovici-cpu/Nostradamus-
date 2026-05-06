@@ -98,12 +98,20 @@ def index():
     # current classifier rules (not the stale cluster_auto stored at entry).
     # This makes pre-existing sports/esports positions disappear from the
     # open view as soon as the user deploys the new rules.
+    # Also hide UMA-flagged positions when BLOCK_UMA_FLAGGED is on.
     skip = config.SKIP_CLUSTERS
+    block_uma = config.BLOCK_UMA_FLAGGED
     n_hidden = 0
     visible_rows = []
     for r in rows:
         eff = _effective_cluster(r)
         if eff in skip:
+            n_hidden += 1
+            continue
+        # uma_risk_flag stored as "1"/"0" or 1/0 depending on CSV roundtrip
+        uma_raw = r.get("uma_risk_flag")
+        is_uma = str(uma_raw).strip() in ("1", "true", "True")
+        if block_uma and is_uma:
             n_hidden += 1
             continue
         visible_rows.append(r)

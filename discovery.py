@@ -254,11 +254,14 @@ def evaluate_market(market: dict, now_utc: datetime,
         base_row["reject_reason"] = f"cluster_skipped:{base_row['cluster']}"
         return {"pass": False, "reject_reason": base_row["reject_reason"], "row": base_row, "entry_payload": None}
 
-    # 3. UMA dispute flag (non-blocking)
+    # 3. UMA dispute flag — v0.2.0: BLOCKING (was non-blocking in v0.1.0)
     uma_flag = has_uma_dispute_marker(
         market.get("resolutionSource") or "",
         market.get("description") or "",
     )
+    if uma_flag and config.BLOCK_UMA_FLAGGED:
+        base_row["reject_reason"] = "uma_flagged"
+        return {"pass": False, "reject_reason": base_row["reject_reason"], "row": base_row, "entry_payload": None}
 
     # 4. Token IDs
     tokens = parse_outcomes_and_tokens(market)

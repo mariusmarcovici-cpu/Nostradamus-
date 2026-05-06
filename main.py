@@ -408,6 +408,9 @@ def main():
              config.MAX_OPEN_POSITIONS,
              config.AUTO_RESOLVE_AS_NO_AFTER_HOURS,
              not config.RESOLUTION_REQUIRE_TWO_POLLS)
+    log.info("Block UMA-flagged: %s",
+             "yes (subjective resolution markets blocked at entry + hidden in dashboard)"
+             if config.BLOCK_UMA_FLAGGED else "no (UMA flag is label-only)")
     log.info("=" * 60)
 
     position.init_state()
