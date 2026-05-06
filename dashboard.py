@@ -19,10 +19,24 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify
 
 import config
 import position
-from cluster import CLUSTERS
+from cluster import CLUSTERS, classify
 
 log = logging.getLogger(__name__)
 app = Flask(__name__, template_folder=".")
+
+
+def _effective_cluster(r: dict) -> str:
+    """v0.2.0: cluster used for SKIP filtering. Considers manual override
+    first, then re-classifies using current rules (since cluster.py was
+    updated to detect esports + obscure-league sports that older entries
+    would have stored as H_OTHER)."""
+    override = (r.get("cluster_override") or "").strip()
+    if override:
+        return override
+    # Re-classify with question text only (tags weren't stored at entry).
+    # Current rules will catch esports / draw markets / matchup format
+    # that the original classifier missed.
+    return classify(r.get("question", "") or "")
 
 
 def _ttr_remaining(end_iso: str) -> str:
@@ -80,6 +94,20 @@ def index():
     scaled = request.args.get("scaled") == "1"
     summary = position.compute_summary(scaled=scaled)
     rows = position.open_positions()
+    # v0.2.0: hide positions whose cluster is in SKIP_CLUSTERS, using
+    # current classifier rules (not the stale cluster_auto stored at entry).
+    # This makes pre-existing sports/esports positions disappear from the
+    # open view as soon as the user deploys the new rules.
+    skip = config.SKIP_CLUSTERS
+    n_hidden = 0
+    visible_rows = []
+    for r in rows:
+        eff = _effective_cluster(r)
+        if eff in skip:
+            n_hidden += 1
+            continue
+        visible_rows.append(r)
+    rows = visible_rows
     # Decorate rows for display
     decorated = []
     for r in rows:
@@ -91,6 +119,10 @@ def index():
         decorated.append(d)
     # Sort by TTR ascending (closest to resolution first)
     decorated.sort(key=lambda x: x.get("end_date_iso") or "9999")
+    # Adjust summary so the visible "Open" count matches what's shown
+    summary = dict(summary)
+    summary["open"] = len(decorated)
+    summary["hidden_by_skip"] = n_hidden
     return render_template(
         "dashboard.html",
         summary=summary,
